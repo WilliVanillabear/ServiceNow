@@ -1,0 +1,27 @@
+var answer1 = false;
+var subManager = check_subManager();
+//gs.log(current.group.manager, "CLENZ GROUP ACL 1");
+if (current.group.manager == gs.getUserID() || subManager) {
+    answer1 = true; 
+}
+//gs.log("anwser1 " + answer1, "CLENZ GROUP ACL 1");
+answer = answer1;
+function check_subManager(){
+    //gs.log(current.group.u_sub_manager, "CLENZ GROUP ACL 1");
+    var smArray = current.group.u_sub_manager.split(",");
+    for(var i = 0; i < smArray.length; i++){        
+        if(smArray[i] == gs.getUserID()){
+            gs.log("evaluaed to true", "CLENZ GROUP ACL 1");
+            return true;
+        }
+    }
+    return false;
+}
+
+
+_____
+
+var answer = true; //Hide the 'Edit' button by default
+if((gs.hasRole('vwg_group_admin') && (parent.manager == gs.getUserID() || parent.u_sub_manager.match(gs.getUserID()))) || gs.hasRole('admin') || gs.hasRole('vwg_helpdesk')){
+   answer = false; //Show the 'Edit' button if user has 'user_admin' role or is group manager
+}

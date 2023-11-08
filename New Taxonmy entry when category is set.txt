@@ -1,0 +1,38 @@
+//MappingTaxonomyTopicsToCategoriesIU -> BR on insert ond Update
+
+(function executeRule(current, previous /*null when async*/) {
+
+	var catalogItemTypeID = "98f9a16553622010069addeeff7b1248";
+	var topic = "";
+
+	//Searcht the new Topic
+	var grCategoryTopic = new GlideRecord("u_m2m_sc_category_topic");
+	grCategoryTopic.addQuery("u_sc_category", current.getValue("category"));
+	grCategoryTopic.addQuery("u_active", true);
+	grCategoryTopic.query();
+
+	if(grCategoryTopic.next()) {
+		topic = grCategoryTopic.getValue("u_topic");
+	}
+	
+	//Look if a Connected Content Record exists for this cat item
+	var grConnectedContent = new GlideRecord("m2m_connected_content");
+	grConnectedContent.addQuery("content_type", catalogItemTypeID);
+	grConnectedContent.addQuery("catalog_item", current.getUniqueValue());
+	grConnectedContent.query();
+
+	//Upate the old record
+	if(grConnectedContent.next() && topic !== "") {
+		grConnectedContent.setValue("topic", topic);
+		grConnectedContent.update();
+	}
+	//Create a new record
+	else if (topic !== ""){
+		grConnectedContent.initialize();
+		grConnectedContent.setValue("content_type", catalogItemTypeID);
+		grConnectedContent.setValue("catalog_item", current.getUniqueValue());
+		grConnectedContent.setValue("topic", topic);
+		grConnectedContent.insert();
+	}
+
+})(current, previous);

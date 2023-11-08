@@ -1,0 +1,20 @@
+
+//Remove all group memberships that contains itil role and user has not been logged in for 3 months (inactive).
+
+var TCH_Remove_Role_From_User = Class.create();
+TCH_Remove_Role_From_User.prototype = {
+    initialize: function() {
+    },
+	
+	RemoveItilMemberships: function(){
+		var ga = new GlideRecord('sys_user_grmember');
+		ga.addEncodedQuery('user.last_login<javascript:gs.beginningOfLast3Months()^user.roles=itil^group.roles=itil');
+		ga.query();
+
+		while(ga.next()){
+			ga.deleteRecord();
+		}
+	},
+	
+    type: 'TCH_Remove_Role_From_User'
+};

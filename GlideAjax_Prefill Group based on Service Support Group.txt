@@ -1,0 +1,123 @@
+function onChange(control, oldValue, newValue, isLoading, isTemplate) {
+    if (isLoading) {
+        return;
+    }
+
+    var service = g_form.getValue('business_service');
+
+    if (newValue != '' && service == '') { // if service field is NOT filled but ci field is filled, take supportgroup form ci
+        var ga_ci = new GlideAjax('global.TCH_Incident_Utils_AJAX');
+        ga_ci.addParam('sysparm_name', 'getSupportGroupFromCI');
+        ga_ci.addParam('sysparm_ci', newValue);
+        ga_ci.getXML(SupportGroupParse);
+    } else if (newValue == '' && service == '') { //if service field and ci field are both not filled, set assignmentgroup to null
+        g_form.setValue('assignment_group', '');
+    }
+
+
+    function SupportGroupParse(response) {
+        var answer = response.responseXML.documentElement.getAttribute("answer");
+        var service = g_form.getValue('business_service');
+
+        if (answer != null && service == '') {
+            g_form.setValue('assignment_group', answer);
+        }
+    }
+
+
+
+
+
+_____
+
+
+ar TCH_Incident_Utils_AJAX = Class.create();
+TCH_Incident_Utils_AJAX.prototype = Object.extendsObject(AbstractAjaxProcessor, {
+
+    type: 'TCH_Incident_Utils_AJAX',
+
+    getUserLocation: function() {
+        var user = this.getParameter('sysparm_user_name');
+        var userGR = new GlideRecord('sys_user');
+
+        if (userGR.get(user)) {
+            return userGR.getValue('location');
+        } else {
+            return '';
+        }
+    },
+
+    getSupportGroupFromService: function() {
+        // get service value (sys_id)
+        var service = this.getParameter('sysparm_service');
+        var servGR = new GlideRecord('cmdb_ci_service');
+        servGR.addQuery('sys_id', service);
+        servGR.query();
+        servGR.get(service);
+
+        //get list of exclusions
+        var exclusionList = gs.getProperty('tch.inc.assignment.exclusions');
+        var excMatch = false;
+
+        //proof if service is in exclusion list
+        var sName = servGR.name;
+        if (exclusionList.indexOf(sName) > -1) {
+            excMatch = true;
+        }
+
+        //if service is an exclusion, return the supportgroup "Service Desk Germany (DE)"
+        if (excMatch == true) {
+            return gs.getProperty('tch.inc.assignment.exclusion.assignmentgroup');
+        }
+
+        //if service is not an exclusion and has a supportgroup defined, return supportgroup from service
+        else if (servGR.get(service)) {
+            return servGR.getValue('support_group');
+        }
+
+        //if service is NOT an exclusion and has not an supportgroup defined, return null
+        else {
+            return null;
+        }
+    },
+
+    getPrio1SupportGroupFromService: function() {
+        //get service value (sys_id)
+        var service = this.getParameter('sysparm_service');
+        var serviceGR = new GlideRecord('cmdb_ci_service');
+        serviceGR.addQuery('sys_id', ''+service);
+        serviceGR.query();
+
+        if (serviceGR.next()) {
+            if (serviceGR.u_prio1_support_group) {
+                return ''+serviceGR.getValue('u_prio1_support_group');
+            } else {
+                return ''+serviceGR.getValue('support_group');
+            } 
+        }
+    },
+
+    getSupportGroupFromCI: function() {
+
+        var ci = this.getParameter('sysparm_ci');
+        var ciGR = new GlideRecord('cmdb_ci');
+        if (ciGR.get(ci)) {
+            return ciGR.getValue('support_group');
+        }
+        return null;
+    },
+
+    getAffectedUserTchiboBU: function() {
+        var affectedUser = this.getParameter('sysparm_afuser');
+        var answer;
+
+        var userbu = new GlideRecord('sys_user');
+        userbu.addQuery('sys_id', affectedUser);
+        userbu.query();
+        if (userbu.next()) {
+            answer = userbu.getValue('u_tchibo_bu');
+        }
+        return answer;
+    }
+
+});

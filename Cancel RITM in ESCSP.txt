@@ -1,0 +1,129 @@
+Select My Request Filter application menu entry
+
+
+https://tchdev.service-now.com/now/nav/ui/classic/params/target/request_filter.do%3Fsys_id%3D0ba6e56773320010b30e2ee2c4f6a78b%26sysparm_record_target%3Drequest_filter%26sysparm_record_row%3D1%26sysparm_record_rows%3D9%26sysparm_record_list%3Dactive%253Dtrue
+
+Select "standard Ticket Configuratio" -> sc_req_item to make Button visible in Portal
+
+Clone standard Ticket Actions Widget
+
+Adjust "Servicer script" as follows:
+
+(function() {
+    var ritmGr = new GlideRecord('sc_req_item');
+    var ritmSysId = options.sys_id;
+
+    if (!ritmSysId && $sp.getParameter('table') == 'sc_req_item')
+        ritmSysId = $sp.getParameter('sys_id');
+
+    if (!ritmSysId && $sp.getParameter('table') == 'universal_request') {
+        var urGr = new GlideRecord('universal_request');
+        urGr.get($sp.getParameter('sys_id'));
+        ritmSysId = urGr.primary_task + "";
+    }
+
+    /* Actions - Start */
+    if (input && input.action == 'cancelRequest' && ritmGr.get(ritmSysId)) {
+
+        ritmGr.stage = 'request_cancelled'; //Request Cancelled
+        ritmGr.state = '3'; //Closed
+        ritmGr.u_close_code = '2'; //Storno
+
+        data.isRequestCancelled = ritmGr.update();
+		cancelFlowExecution(ritmGr);
+		gs.addInfoMessage(gs.getMessage('Request Cancelled Message'));
+    }
+
+    /* Actions - End */
+
+    /* Load ritm data */
+    if (ritmGr.get(ritmSysId)) {
+        data.canCancel = canCancelRitm(ritmGr);
+        data.showActions = data.canCancel;
+    }
+
+    function canCancelRitm(ritmGr) {
+        if (ritmGr.getValue('stage') == 'waiting_for_approval')
+            return true;
+
+        return false;
+    }
+
+    function cancelFlowExecution(ritmGr) {
+        var flow = new GlideRecord("sys_flow_context");
+        flow.addQuery('flow', ritmGr.cat_item.flow_designer_flow.toString());
+        flow.addQuery('source_record', ritmGr.getValue('sys_id'));
+        flow.addEncodedQuery('stateINWAITING,IN_PROGRESS,QUEUED');
+        flow.query();
+
+        while (flow.next()) {
+            sn_fd.FlowAPI.cancel(flow.sys_id, gs.getMessage('Flow cancelled by user'));
+        }
+    }
+
+    data.i18n = {};
+
+})();
+
+
+_____
+
+Client Controller:
+
+function ritmTicketActions($scope, $http, spUtil, $timeout, spModal, i18n, $window, $uibModal, spAriaUtil) {
+    /* widget controller */
+    var c = this;
+    c.doneLoading = false;
+    c.requestCancelledMsg = "${Request Cancelled Message}";
+
+    var MOBILE_DEVICE_SCREEN_WIDTH = 767;
+    $scope.mobileDevice = c.data.isMobile || ($window.innerWidth < MOBILE_DEVICE_SCREEN_WIDTH);
+
+	//Cancel Request
+	$scope.cancelRequest = function() {
+        $scope.data.action = 'cancelRequest';
+        $scope.server.update(init).then(function(response){
+					if (response.isRequestCancelled)
+						spAriaUtil.sendLiveMessage(c.requestCancelledMsg);
+				});
+		$scope.$emit('focusOnActions', {"isFocusRequired": true});
+    };
+
+    function init() {}
+	
+    $(document).on('click', 'div.modal-footer button.btn, ul#child-case-tabs .dropdown-menu', function(e) {
+        e.stopPropagation();
+    });
+
+    $(document).bind('dragover drop', function(event) {
+        event.preventDefault();
+        return false;
+    });
+
+    $scope.$on('sp_loading_indicator', function(e, value) {
+        if (!value && !c.doneLoading) {
+            c.doneLoading = true;
+        }
+    });
+}
+
+
+____
+
+Body HTML Template:
+
+              <div>
+    <div class="dropdown" id="child-case-tabs" ng-if="data.showActions">
+        <button type="button" id="actions-button" class="btn btn-default dropdown-toggle action-btn" data-toggle="dropdown" style="width : 100%" aria-haspopup="true" ng-init="setFocusOnActionButtons()">
+            ${Actions}
+            <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu pull-right" id="actionList">
+            <li>
+                <a ng-if="data.canCancel" href="javascript:void(0)" ng-click="$event.stopPropagation();cancelRequest()">${TCH Cancel Request}</a>
+            </li>
+        </ul>
+    </div>
+  
+</div>
+
